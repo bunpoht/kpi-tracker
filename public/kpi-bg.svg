@@ -1,0 +1,35 @@
+<svg viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <style>
+      @media (prefers-reduced-motion: no-preference) {
+        .geo-shape { animation: float 6s ease-in-out infinite; }
+        .geo-shape:nth-child(2) { animation-delay: 1s; }
+        .geo-shape:nth-child(3) { animation-delay: 2s; }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+      }
+    </style>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="1400" height="900" fill="url(#grad1)"/>
+  
+  <!-- Decorative geometric shapes -->
+  <circle class="geo-shape" cx="100" cy="150" r="80" fill="#3b82f6" opacity="0.1"/>
+  <circle class="geo-shape" cx="1300" cy="200" r="120" fill="#06b6d4" opacity="0.08"/>
+  <circle class="geo-shape" cx="700" cy="700" r="100" fill="#8b5cf6" opacity="0.1"/>
+  
+  <!-- Lines and patterns -->
+  <path d="M 0 100 Q 350 50 700 100 T 1400 100" stroke="#3b82f6" stroke-width="1" fill="none" opacity="0.2"/>
+  <path d="M 0 300 Q 350 250 700 300 T 1400 300" stroke="#06b6d4" stroke-width="1" fill="none" opacity="0.15"/>
+  <path d="M 0 700 Q 350 650 700 700 T 1400 700" stroke="#8b5cf6" stroke-width="1" fill="none" opacity="0.1"/>
+  
+  <!-- Accent shapes -->
+  <rect x="50" y="600" width="200" height="2" fill="#3b82f6" opacity="0.3" rx="1"/>
+  <rect x="1150" y="400" width="200" height="2" fill="#06b6d4" opacity="0.3" rx="1"/>
+</svg>
