@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, use } from "react"
+import React, { useEffect, useState, use, useMemo } from "react"
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -122,7 +122,6 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   console.log("[KPI Page] Render. Loading:", loading, "Data:", !!data, "GoalID:", goalId)
 
   useEffect(() => {
-    console.log("[KPI Page] useEffect triggered. GoalID:", goalId)
     checkAuth()
     fetchGoalDetails()
     fetchMonthlyData()
@@ -192,7 +191,6 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   }
 
   async function fetchGoalDetails() {
-    console.log("[KPI Page] fetchGoalDetails started")
     try {
       let url = `/api/goals/${goalId}`
       if (startDate && endDate) {
@@ -201,7 +199,6 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
       const response = await fetch(url)
       if (response.ok) {
         const goalData = await response.json()
-        console.log("[KPI Page] fetchGoalDetails success")
         setData(goalData)
       } else {
         console.error("Failed to fetch goal:", response.status)
@@ -209,7 +206,6 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
     } catch (error) {
       console.error("Failed to fetch goal details:", error)
     } finally {
-      console.log("[KPI Page] fetchGoalDetails finally - setting loading to false")
       setLoading(false)
     }
   }
@@ -233,14 +229,12 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
 
   async function fetchAllGoals() {
     try {
-      let url = "/api/home"
-      if (startDate && endDate) {
-        url += `?startDate=${startDate}&endDate=${endDate}`
-      }
-      const response = await fetch(url)
+      // Use the lightweight list endpoint for navigation
+      const response = await fetch("/api/goals/list")
       if (response.ok) {
         const result = await response.json()
-        const sortedGoals = result.goals.sort((a: any, b: any) => a.displayOrder - b.displayOrder)
+        // The API already sorts by displayOrder, but we can ensure it here if needed
+        const sortedGoals = result.goals
         setAllGoals(sortedGoals)
         const index = sortedGoals.findIndex((g: any) => g.id === Number.parseInt(goalId))
         setCurrentIndex(index)
@@ -307,41 +301,52 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
     return `${day} ${month} ${year}`
   }
 
-  const filteredWorkLogs =
-    selectedUserId === "all"
+  const filteredWorkLogs = useMemo(() => {
+    return selectedUserId === "all"
       ? data?.workLogs || []
       : data?.workLogs.filter((log) => log.user.id === Number.parseInt(selectedUserId)) || []
+  }, [data?.workLogs, selectedUserId])
 
-  const monthFilteredWorkLogs = !imageFilterDate
-    ? filteredWorkLogs
-    : filteredWorkLogs.filter((log) => {
+  const monthFilteredWorkLogs = useMemo(() => {
+    if (!imageFilterDate) return filteredWorkLogs
+    return filteredWorkLogs.filter((log) => {
       const logDate = new Date(log.date)
-      const match = (
+      return (
         logDate.getFullYear() === imageFilterDate.year &&
         logDate.getMonth() + 1 === imageFilterDate.month
       )
-      return match
     })
+  }, [filteredWorkLogs, imageFilterDate])
 
   // Flatten images for Masonry Gallery
-  const galleryImages = monthFilteredWorkLogs.flatMap(log =>
-    (log.images || []).map((img: any) => ({
-      ...img,
-      log: log // Attach the parent log to the image for context
-    }))
-  );
+  const galleryImages = useMemo(() => {
+    return monthFilteredWorkLogs.flatMap((log) =>
+      (log.images || []).map((img: any) => ({
+        ...img,
+        log: log, // Attach the parent log to the image for context
+      })),
+    )
+  }, [monthFilteredWorkLogs])
 
-  const totalProgress = filteredWorkLogs.reduce((sum, log) => sum + Number.parseFloat(log.completedWork.toString()), 0)
-  const progressPercentage = data ? Math.min((totalProgress / data.goal.target) * 100, 100) : 0
+  const totalProgress = useMemo(() => {
+    return filteredWorkLogs.reduce((sum, log) => sum + Number.parseFloat(log.completedWork.toString()), 0)
+  }, [filteredWorkLogs])
 
-  const filteredMonthlyData =
-    selectedUserId === "all"
+  const progressPercentage = useMemo(() => {
+    return data ? Math.min((totalProgress / data.goal.target) * 100, 100) : 0
+  }, [data, totalProgress])
+
+  const filteredMonthlyData = useMemo(() => {
+    return selectedUserId === "all"
       ? monthlyData
       : monthlyData.map((item) => {
         const monthLogs = filteredWorkLogs.filter((log) => {
           const logDate = new Date(log.date)
           const [year, month] = item.month.split("-")
-          return logDate.getFullYear() === Number.parseInt(year) && logDate.getMonth() + 1 === Number.parseInt(month)
+          return (
+            logDate.getFullYear() === Number.parseInt(year) &&
+            logDate.getMonth() + 1 === Number.parseInt(month)
+          )
         })
 
         if (subMetrics.length > 0) {
@@ -359,27 +364,43 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
           return { ...item, total }
         }
       })
+  }, [selectedUserId, monthlyData, filteredWorkLogs, subMetrics])
 
-  const chartData = filteredMonthlyData.map((item) => {
-    const [year, month] = item.month.split("-")
-    const thaiMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
-    const monthIndex = Number.parseInt(month) - 1
-    const buddhistYear = Number.parseInt(year) + 543
+  const chartData = useMemo(() => {
+    return filteredMonthlyData.map((item) => {
+      const [year, month] = item.month.split("-")
+      const thaiMonths = [
+        "ม.ค.",
+        "ก.พ.",
+        "มี.ค.",
+        "เม.ย.",
+        "พ.ค.",
+        "มิ.ย.",
+        "ก.ค.",
+        "ส.ค.",
+        "ก.ย.",
+        "ต.ค.",
+        "พ.ย.",
+        "ธ.ค.",
+      ]
+      const monthIndex = Number.parseInt(month) - 1
+      const buddhistYear = Number.parseInt(year) + 543
 
-    const result: any = {
-      month: `${thaiMonths[monthIndex]} ${String(buddhistYear).slice(-2)}`,
-    }
+      const result: any = {
+        month: `${thaiMonths[monthIndex]} ${String(buddhistYear).slice(-2)}`,
+      }
 
-    if (subMetrics.length > 0) {
-      subMetrics.forEach((sm) => {
-        result[sm.name] = item[sm.name] || 0
-      })
-    } else {
-      result.total = item.total || 0
-    }
+      if (subMetrics.length > 0) {
+        subMetrics.forEach((sm) => {
+          result[sm.name] = item[sm.name] || 0
+        })
+      } else {
+        result.total = item.total || 0
+      }
 
-    return result
-  })
+      return result
+    })
+  }, [filteredMonthlyData, subMetrics])
 
   const GRADIENT_COLORS = [
     "bg-gradient-to-r from-violet-500 to-indigo-500",
@@ -723,6 +744,7 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                           axisLine={false}
                           tickLine={false}
                           dx={-10}
+                          tickFormatter={(value) => value.toLocaleString()}
                         />
                         <RechartsTooltip
                           contentStyle={{
@@ -742,7 +764,7 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                                 dataKey={sm.name}
                                 position="inside"
                                 className="fill-white font-prompt text-xl font-bold drop-shadow-md"
-                                formatter={(value: number) => value > 0 ? value : ''}
+                                formatter={(value: number) => value > 0 ? value.toLocaleString() : ''}
                               />
                             </Bar>
                           ))
