@@ -122,6 +122,34 @@
     --chart-5: oklch(0.6 0.2 25);
   }
 
+  :root[data-theme="midnight"],
+  .midnight {
+    --background: #1B2230;
+    --foreground: #FFFFFF;
+    --card: #242E42;
+    --card-foreground: #FFFFFF;
+    --popover: #242E42;
+    --popover-foreground: #FFFFFF;
+    --primary: #F97316;
+    --primary-foreground: #FFFFFF;
+    --secondary: #323C52;
+    --secondary-foreground: #FFFFFF;
+    --muted: #323C52;
+    --muted-foreground: #94A3B8;
+    --accent: #F97316;
+    --accent-foreground: #FFFFFF;
+    --destructive: oklch(0.6 0.2 25);
+    --destructive-foreground: #FFFFFF;
+    --border: #323C52;
+    --input: #323C52;
+    --ring: #F97316;
+    --chart-1: #F97316;
+    --chart-2: #3B82F6;
+    --chart-3: #10B981;
+    --chart-4: #F59E0B;
+    --chart-5: #EF4444;
+  }
+
   /* FORCE PROMPT FONT GLOBALLY */
   * {
     border-color: var(--border);

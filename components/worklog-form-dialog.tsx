@@ -191,7 +191,7 @@ export function WorkLogFormDialog({ goalId, onSuccess }: WorkLogFormDialogProps)
 
         <div className="space-y-2">
           <Label className="font-prompt text-foreground">รูปภาพ (ไม่บังคับ)</Label>
-          <ImageUpload images={images} onImagesChange={setImages} maxImages={5} />
+          <ImageUpload images={images} onImagesChange={setImages} maxImages={10} />
         </div>
 
         {error && <p className="text-sm text-destructive font-prompt">{error}</p>}

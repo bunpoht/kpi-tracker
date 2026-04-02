@@ -12,7 +12,7 @@ interface ImageUploadProps {
   maxImages?: number
 }
 
-export function ImageUpload({ images, onImagesChange, maxImages = 5 }: ImageUploadProps) {
+export function ImageUpload({ images, onImagesChange, maxImages = 10 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const inputId = useId()

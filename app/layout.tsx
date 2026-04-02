@@ -29,7 +29,7 @@ export default async function RootLayout({
 }) {
   const supabase = await createClient()
   const { data: settings } = await supabase.from("Settings").select("*").eq("key", "globalTheme").single()
-  const globalTheme = (settings?.value as "light" | "violet") || "light"
+  const globalTheme = (settings?.value as "light" | "violet" | "midnight") || "light"
 
   return (
     <html lang="en" className={globalTheme} data-theme={globalTheme}>

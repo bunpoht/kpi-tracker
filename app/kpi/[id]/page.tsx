@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, use, useMemo } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -20,7 +20,7 @@ import {
   LabelList,
 } from "recharts"
 import type { Goal, GoalAssignment, WorkLog } from "@/types"
-import { X, Home, ChevronLeft, ChevronRight, Filter, LogIn, LogOut, LayoutDashboard, Pencil, Trash2, Calendar, User, Clock, MoreVertical } from 'lucide-react'
+import { X, Home, ChevronLeft, ChevronRight, Filter, LogIn, LogOut, LayoutDashboard, Pencil, Trash2, Calendar, User, Clock, MoreVertical, Grid, RectangleVertical, Layers } from 'lucide-react'
 import { EditWorkLogForm } from "@/components/edit-worklog-dialog"
 import { WorkLogFormDialog } from "@/components/worklog-form-dialog"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
@@ -97,6 +97,11 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
     showWorkLogImages: true,
     showWorkLogDescription: true,
   })
+
+  // State for Gallery Layout: 'masonry' | 'grid'
+  const [galleryLayout, setGalleryLayout] = useState<'masonry' | 'grid'>('grid')
+  // State for Left Column Layout: 'split' | 'unified'
+  const [leftColumnLayout, setLeftColumnLayout] = useState<'split' | 'unified'>('unified')
 
   const startMonth = searchParams.get("startMonth")
   const startYear = searchParams.get("startYear")
@@ -333,7 +338,7 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   }, [filteredWorkLogs])
 
   const progressPercentage = useMemo(() => {
-    return data ? Math.min((totalProgress / data.goal.target) * 100, 100) : 0
+    return data && data.goal.target > 0 ? (totalProgress / data.goal.target) * 100 : 0
   }, [data, totalProgress])
 
   const filteredMonthlyData = useMemo(() => {
@@ -417,29 +422,44 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
     window.location.reload()
   }
 
-  async function handleDeleteWorkLog(workLogId: number) {
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบบันทึกการทำงานนี้?")) {
+
+
+  async function handleDeleteImage(log: any, imageUrl: string) {
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพนี้?")) {
       return
     }
 
-    setDeletingId(workLogId)
     try {
-      const response = await fetch(`/api/worklogs/${workLogId}`, {
-        method: "DELETE",
-        credentials: "include",
+      // Filter out the image to be deleted
+      const newImages = (log.images || [])
+        .filter((img: any) => img.url !== imageUrl)
+        .map((img: any) => img.url)
+
+      const response = await fetch(`/api/worklogs/${log.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          completedWork: log.completedWork,
+          subMetricId: log.subMetricId,
+          subMetricValues: log.subMetricValues,
+          description: log.description,
+          date: log.date,
+          goalId: data?.goal?.id,
+          images: newImages,
+        }),
       })
 
       if (!response.ok) {
-        throw new Error("ไม่สามารถลบบันทึกการทำงานได้")
+        throw new Error("ไม่สามารถลบรูปภาพได้")
       }
 
       await fetchGoalDetails()
       await fetchMonthlyData()
     } catch (error) {
-      console.error("Failed to delete work log:", error)
-      alert("ไม่สามารถลบบันทึกการทำงานได้")
-    } finally {
-      setDeletingId(null)
+      console.error("Failed to delete image:", error)
+      alert("ไม่สามารถลบรูปภาพได้")
     }
   }
 
@@ -520,6 +540,255 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
     )
   }
 
+  const renderLeftColumn = () => {
+    const heroContent = (
+      <>
+        <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+            <div className="flex-1 space-y-4">
+              <h1 className="font-prompt font-bold text-3xl md:text-4xl leading-tight">
+                {data.goal.title}
+              </h1>
+              {data.goal.description && (
+                <p className="font-prompt font-light text-white/90 text-lg max-w-2xl">
+                  {data.goal.description}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-sm font-prompt">
+                  <Calendar className="w-4 h-4" />
+                  <span>{formatThaiDate(new Date(data.goal.startDate))} - {formatThaiDate(new Date(data.goal.endDate))}</span>
+                </div>
+              </div>
+            </div>
+
+            {userData ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    const month = Number.parseInt(selectedMonthValue)
+                    const fiscalYear = Number.parseInt(selectedFiscalYear)
+                    const year = month >= 10 ? fiscalYear - 1 : fiscalYear
+
+                    // Find logs matching month and year
+                    const targetLogs = data.workLogs.filter((log) => {
+                      const d = new Date(log.date)
+                      return d.getMonth() + 1 === month && d.getFullYear() === year
+                    })
+
+                    if (targetLogs.length === 0) {
+                      alert(`ไม่พบข้อมูลการทำงานในเดือน ${THAI_MONTHS.find(m => m.value === selectedMonthValue)?.label} ${year + 543}`)
+                    } else if (targetLogs.length === 1) {
+                      setEditingWorkLog(targetLogs[0])
+                    } else {
+                      alert(`พบข้อมูล ${targetLogs.length} รายการในเดือนนี้ กรุณาเลือกรายการที่ต้องการแก้ไขจากส่วน "แกลเลอรีผลงาน" ด้านล่าง`)
+                      // Optional: scroll to gallery
+                      document.querySelector('.scroll-area')?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white border-0 font-prompt shadow-lg"
+                  size="lg"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  แก้ไข
+                </Button>
+                <Button
+                  onClick={() => setShowWorkLogForm(true)}
+                  className="bg-white text-primary hover:bg-white/90 font-prompt shadow-lg border-0"
+                  size="lg"
+                >
+                  บันทึกการทำงาน
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => router.push("/login")}
+                className="bg-white/20 hover:bg-white/30 text-white border-0 font-prompt"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                เข้าสู่ระบบเพื่อบันทึก
+              </Button>
+            )}
+          </div>
+        </div>
+      </>
+    )
+
+    const progressContent = (
+      <>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-border/50">
+          <div className="space-y-1">
+            <h3 className="font-prompt font-medium text-muted-foreground">ความคืบหน้าทั้งหมด</h3>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="font-prompt text-4xl text-primary">
+                {totalProgress.toLocaleString()}
+              </span>
+              <span className="font-prompt text-muted-foreground text-lg">/</span>
+              <span className="font-prompt text-4xl text-muted-foreground">
+                {data.goal.target.toLocaleString()}
+              </span>
+              <span className="font-prompt text-muted-foreground text-sm self-end mb-1">
+                {data.goal.unit || "ชิ้น"}
+              </span>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="font-prompt text-4xl text-foreground">
+              {progressPercentage.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+
+        <Progress value={Math.min(progressPercentage, 100)} className="h-4 rounded-full" />
+
+        {userData && data.assignments && data.assignments.length > 1 && (
+          <div className="flex items-center gap-3 pt-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="font-prompt text-sm text-muted-foreground">กรองตามบุคคล:</span>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <SelectTrigger className="w-[200px] h-8 font-prompt text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="font-prompt">ทุกคน</SelectItem>
+                {data.assignments.map((assignment) => (
+                  <SelectItem key={assignment.user.id} value={assignment.user.id.toString()} className="font-prompt">
+                    {assignment.user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </>
+    )
+
+    const chartContent = (
+      <>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-prompt font-semibold text-lg">สถิติรายเดือน</h3>
+          {subMetrics.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {subMetrics.map((sm) => (
+                <div key={sm.id} className="flex items-center gap-2 text-xs">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sm.color }} />
+                  <span className="font-prompt text-muted-foreground">{sm.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="h-[350px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 50, right: 0, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+              <XAxis
+                dataKey="month"
+                tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontFamily: "Prompt" }}
+                axisLine={false}
+                tickLine={false}
+                dy={10}
+              />
+              <YAxis
+                tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontFamily: "Prompt" }}
+                axisLine={false}
+                tickLine={false}
+                dx={-10}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <RechartsTooltip
+                contentStyle={{
+                  backgroundColor: "var(--popover)",
+                  borderColor: "var(--border)",
+                  borderRadius: "0.5rem",
+                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  fontFamily: "Prompt",
+                  color: "var(--popover-foreground)",
+                }}
+                cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+              />
+              {subMetrics.length > 0 ? (
+                subMetrics.map((sm) => (
+                  <Bar key={sm.id} dataKey={sm.name} fill={sm.color} radius={[0, 0, 0, 0]} stackId="a">
+                    <LabelList
+                      dataKey={sm.name}
+                      position="inside"
+                      className="fill-white font-prompt text-xl font-bold drop-shadow-md"
+                      formatter={(value: any) => value > 0 ? Number(value).toLocaleString() : ''}
+                    />
+                  </Bar>
+                ))
+              ) : (
+                <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="total"
+                    position="top"
+                    className="fill-foreground font-prompt text-2xl font-bold"
+                    offset={10}
+                    formatter={(value: any) => value > 0 ? Number(value).toLocaleString() : ''}
+                  />
+                </Bar>
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </>
+    )
+
+    if (leftColumnLayout === 'split') {
+      return (
+        <div className="space-y-8">
+          {/* Hero Card */}
+          <div className={`${gradientClass} rounded-2xl shadow-lg p-8 relative overflow-hidden text-white`}>
+            {heroContent}
+          </div>
+
+          {/* Progress Card */}
+          <Card className="border-border/50 shadow-sm bg-card/80 backdrop-blur-sm">
+            <CardContent className="p-6 space-y-6">
+              {progressContent}
+            </CardContent>
+          </Card>
+
+          {/* Chart Section */}
+          {chartData.length > 0 && (
+            <Card className="border-border/50 shadow-sm bg-card/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                {chartContent}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )
+    }
+
+    // Unified Layout
+    return (
+      <div className="flex flex-col rounded-2xl overflow-hidden">
+        {/* Hero Section */}
+        <div className={`${gradientClass} p-8 relative overflow-hidden text-white`}>
+          {heroContent}
+        </div>
+
+        {/* Progress Section */}
+        <div className="p-6 border-b border-border/50 bg-card/50 backdrop-blur-sm space-y-6">
+          {progressContent}
+        </div>
+
+        {/* Chart Section */}
+        {chartData.length > 0 && (
+          <div className="p-6 bg-card/50 backdrop-blur-sm">
+            {chartContent}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
       className={`min-h-screen bg-background pb-12 transition-colors duration-300 ${backgroundImageUrl ? "bg-cover bg-center bg-fixed" : ""}`}
@@ -549,37 +818,41 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                 const params = new URLSearchParams(searchParams.toString())
                 router.push(`/?${params.toString()}`)
               }}
-              className="font-prompt text-muted-foreground hover:text-foreground"
+              className="font-prompt text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground px-2"
             >
-              <ChevronLeft className="w-4 h-4 mr-1" />
+              <ChevronLeft className="w-5 h-5 mr-1" />
               กลับหน้าแรก
             </Button>
+            <span className="hidden md:inline-block h-4 w-px bg-border/50 mx-2" />
+            <h1 className="hidden md:block font-prompt font-semibold text-lg text-foreground">
+              รายงานผลงานข่าวและการสื่อสารดิจิทัล
+            </h1>
           </div>
 
           {/* Date Filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Select value={selectedFiscalYear} onValueChange={handleFiscalYearChange}>
-              <SelectTrigger className="h-8 w-24 text-xs font-prompt bg-background/50">
+              <SelectTrigger className="h-10 w-28 text-base font-medium font-prompt bg-background/80">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {fiscalYearOptions.map((year) => (
-                  <SelectItem key={year} value={year.toString()} className="font-prompt text-xs">
+                  <SelectItem key={year} value={year.toString()} className="font-prompt text-base">
                     {year + 543}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={selectedMonthValue} onValueChange={handleMonthChange}>
-              <SelectTrigger className="h-8 w-28 text-xs font-prompt bg-background/50">
+              <SelectTrigger className="h-10 w-32 text-base font-medium font-prompt bg-background/80">
                 <SelectValue>
-                  {THAI_MONTHS.find((m) => m.value === selectedMonthValue)?.shortLabel}
+                  {THAI_MONTHS.find((m) => m.value === selectedMonthValue)?.label}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {THAI_MONTHS.map((month) => (
-                  <SelectItem key={month.value} value={month.value} className="font-prompt text-xs">
-                    {month.shortLabel}
+                  <SelectItem key={month.value} value={month.value} className="font-prompt text-base">
+                    {month.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -608,189 +881,64 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
+
+            <div className="h-6 w-px bg-border/50 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/50 hidden md:flex">
+              <Button
+                variant={leftColumnLayout === 'split' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 rounded-md"
+                onClick={() => setLeftColumnLayout('split')}
+                title="แบบเดิม (แยกส่วน)"
+              >
+                <Layers className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={leftColumnLayout === 'unified' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 rounded-md"
+                onClick={() => setLeftColumnLayout('unified')}
+                title="แบบใหม่ (รวมส่วน)"
+              >
+                <RectangleVertical className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Main Layout: 50/50 Split */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column: Hero, Progress, Charts */}
-          <div className="space-y-8">
-            {/* Hero Card */}
-            <div className={`${gradientClass} rounded-2xl shadow-lg p-8 relative overflow-hidden text-white`}>
-              <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          {/* Left Column: Hero, Progress, Charts */}
+          {renderLeftColumn()}
 
-              <div className="relative z-10">
-                <div className="flex flex-col md:flex-row items-start justify-between gap-6">
-                  <div className="flex-1 space-y-4">
-                    <h1 className="font-prompt font-bold text-3xl md:text-4xl leading-tight">
-                      {data.goal.title}
-                    </h1>
-                    {data.goal.description && (
-                      <p className="font-prompt font-light text-white/90 text-lg max-w-2xl">
-                        {data.goal.description}
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap gap-3 pt-2">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-sm font-prompt">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatThaiDate(new Date(data.goal.startDate))} - {formatThaiDate(new Date(data.goal.endDate))}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {userData ? (
-                    <Button
-                      onClick={() => setShowWorkLogForm(true)}
-                      className="bg-white text-primary hover:bg-white/90 font-prompt shadow-lg border-0"
-                      size="lg"
-                    >
-                      บันทึกการทำงาน
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => router.push("/login")}
-                      className="bg-white/20 hover:bg-white/30 text-white border-0 font-prompt"
-                    >
-                      <LogIn className="w-4 h-4 mr-2" />
-                      เข้าสู่ระบบเพื่อบันทึก
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Progress Card */}
-            <Card className="border-border/50 shadow-sm bg-card/80 backdrop-blur-sm">
-              <CardContent className="p-6 space-y-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-border/50">
-                  <div className="space-y-1">
-                    <h3 className="font-prompt font-medium text-muted-foreground">ความคืบหน้าทั้งหมด</h3>
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="font-prompt text-4xl text-primary">
-                        {totalProgress.toLocaleString()}
-                      </span>
-                      <span className="font-prompt text-muted-foreground text-lg">/</span>
-                      <span className="font-prompt text-4xl text-muted-foreground">
-                        {data.goal.target.toLocaleString()}
-                      </span>
-                      <span className="font-prompt text-muted-foreground text-sm self-end mb-1">
-                        {data.goal.unit || "ชิ้น"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-prompt text-4xl text-foreground">
-                      {progressPercentage.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-
-                <Progress value={progressPercentage} className="h-4 rounded-full" />
-
-                {userData && data.assignments && data.assignments.length > 1 && (
-                  <div className="flex items-center gap-3 pt-2">
-                    <Filter className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-prompt text-sm text-muted-foreground">กรองตามบุคคล:</span>
-                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                      <SelectTrigger className="w-[200px] h-8 font-prompt text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" className="font-prompt">ทุกคน</SelectItem>
-                        {data.assignments.map((assignment) => (
-                          <SelectItem key={assignment.user.id} value={assignment.user.id.toString()} className="font-prompt">
-                            {assignment.user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Chart Section */}
-            {chartData.length > 0 && (
-              <Card className="border-border/50 shadow-sm bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-prompt font-semibold text-lg">สถิติรายเดือน</h3>
-                    {subMetrics.length > 0 && (
-                      <div className="flex flex-wrap gap-3">
-                        {subMetrics.map((sm) => (
-                          <div key={sm.id} className="flex items-center gap-2 text-xs">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sm.color }} />
-                            <span className="font-prompt text-muted-foreground">{sm.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 50, right: 0, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                        <XAxis
-                          dataKey="month"
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontFamily: "Prompt" }}
-                          axisLine={false}
-                          tickLine={false}
-                          dy={10}
-                        />
-                        <YAxis
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontFamily: "Prompt" }}
-                          axisLine={false}
-                          tickLine={false}
-                          dx={-10}
-                          tickFormatter={(value) => value.toLocaleString()}
-                        />
-                        <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: "var(--popover)",
-                            borderColor: "var(--border)",
-                            borderRadius: "0.5rem",
-                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                            fontFamily: "Prompt",
-                            color: "var(--popover-foreground)",
-                          }}
-                          cursor={{ fill: "var(--muted)", opacity: 0.5 }}
-                        />
-                        {subMetrics.length > 0 ? (
-                          subMetrics.map((sm) => (
-                            <Bar key={sm.id} dataKey={sm.name} fill={sm.color} radius={[0, 0, 0, 0]} stackId="a">
-                              <LabelList
-                                dataKey={sm.name}
-                                position="inside"
-                                className="fill-white font-prompt text-xl font-bold drop-shadow-md"
-                                formatter={(value: number) => value > 0 ? value.toLocaleString() : ''}
-                              />
-                            </Bar>
-                          ))
-                        ) : (
-                          <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]}>
-                            <LabelList
-                              dataKey="total"
-                              position="top"
-                              className="fill-foreground font-prompt text-2xl font-bold"
-                              offset={10}
-                              formatter={(value: number) => value > 0 ? value : ''}
-                            />
-                          </Bar>
-                        )}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Right Column: Work Log Gallery (Masonry) */}
+          {/* Right Column: Work Log Gallery */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-prompt font-semibold text-lg text-foreground">แกลเลอรีผลงาน</h3>
+              <div className="flex items-center gap-4">
+                <h3 className="font-prompt font-semibold text-lg text-foreground">แกลเลอรีผลงาน</h3>
+                <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/50">
+                  <Button
+                    variant={galleryLayout === 'masonry' ? 'secondary' : 'ghost'}
+                    size="icon"
+                    className="h-7 w-7 rounded-md"
+                    onClick={() => setGalleryLayout('masonry')}
+                    title="แบบเดิม (Masonry)"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={galleryLayout === 'grid' ? 'secondary' : 'ghost'}
+                    size="icon"
+                    className="h-7 w-7 rounded-md"
+                    onClick={() => setGalleryLayout('grid')}
+                    title="แบบตาราง (Grid)"
+                  >
+                    <Grid className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
               <span className="text-xs text-muted-foreground font-prompt bg-muted px-2 py-1 rounded-full">
                 {galleryImages.length} รูปภาพ
               </span>
@@ -805,63 +953,118 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                   <p className="font-prompt text-muted-foreground text-sm">ยังไม่มีรูปภาพผลงาน</p>
                 </div>
               ) : (
-                <div className="columns-2 gap-4 space-y-4">
-                  {galleryImages.map((img, index) => (
-                    <div
-                      key={`${img.id}-${index}`}
-                      className="break-inside-avoid bg-card rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-border/50"
-                    >
-                      {/* Image */}
-                      <div
-                        className="cursor-pointer overflow-hidden"
-                        onClick={() => setSelectedImage(img.url)}
-                      >
-                        <img
-                          src={img.url}
-                          alt="Work Log Evidence"
-                          className="w-full h-auto object-cover transition-transform duration-500 hover:scale-105"
-                          loading="lazy"
-                        />
-                      </div>
+                <>
+                  {galleryLayout === 'masonry' ? (
+                    <div className="columns-2 gap-4 space-y-4">
+                      {galleryImages.map((img, index) => (
+                        <div
+                          key={`${img.id}-${index}`}
+                          className="break-inside-avoid bg-card rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-border/50"
+                        >
+                          <div
+                            className="cursor-pointer overflow-hidden"
+                            onClick={() => setSelectedImage(img.url)}
+                          >
+                            <img
+                              src={img.url}
+                              alt="Work Log Evidence"
+                              className="w-full h-auto object-cover transition-transform duration-500 hover:scale-105"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="p-3 flex items-center justify-between gap-2 bg-card/50">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <Avatar className="w-6 h-6 border border-border">
+                                <AvatarImage src={(img.log.user as any).profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${img.log.user.name}${img.log.user.name === "Chonthicha limpiti" ? "&top[]=longHair&top[]=longHairBob&top[]=longHairCurly&top[]=longHairStraight&facialHairProbability=0" : "&top[]=shortHair&top[]=shortHairTheCaesar&top[]=shortHairShortFlat&top[]=shortHairShortRound&top[]=shortHairShortWaved&facialHairProbability=20"}`} />
+                                <AvatarFallback className={AVATAR_COLORS[img.log.user.id % AVATAR_COLORS.length]}>
+                                  {img.log.user.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-[10px] font-bold font-prompt truncate text-foreground">{img.log.user.name}</span>
+                                <span className="text-[9px] text-muted-foreground font-prompt truncate">{formatThaiDate(new Date(img.log.date))}</span>
+                              </div>
+                            </div>
+                            {userData && (userData.role === "ADMIN" || userData.id === img.log.user.id) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground rounded-full">
+                                    <MoreVertical className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-32">
+                                  <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
+                                    <Pencil className="w-3.5 h-3.5 mr-2" />
+                                    แก้ไข
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeleteImage(img.log, img.url)} className="text-destructive focus:text-destructive">
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                    ลบรูปภาพ
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
 
-                      {/* Footer Details (No Tooltip) */}
-                      <div className="p-3 flex items-center justify-between gap-2 bg-card/50">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <Avatar className="w-6 h-6 border border-border">
-                            <AvatarImage src={(img.log.user as any).profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${img.log.user.name}${img.log.user.name === "Chonthicha limpiti" ? "&top[]=longHair&top[]=longHairBob&top[]=longHairCurly&top[]=longHairStraight&facialHairProbability=0" : "&top[]=shortHair&top[]=shortHairTheCaesar&top[]=shortHairShortFlat&top[]=shortHairShortRound&top[]=shortHairShortWaved&facialHairProbability=20"}`} />
-                            <AvatarFallback className={AVATAR_COLORS[img.log.user.id % AVATAR_COLORS.length]}>
-                              {img.log.user.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[10px] font-bold font-prompt truncate text-foreground">{img.log.user.name}</span>
-                            <span className="text-[9px] text-muted-foreground font-prompt truncate">{formatThaiDate(new Date(img.log.date))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {galleryImages.map((img, index) => (
+                        <div
+                          key={`${img.id}-${index}`}
+                          className="bg-card rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-border/50 flex flex-col h-full"
+                        >
+                          <div
+                            className="cursor-pointer overflow-hidden aspect-[4/3] bg-muted/30 relative flex items-center justify-center p-2"
+                            onClick={() => setSelectedImage(img.url)}
+                          >
+                            <img
+                              src={img.url}
+                              alt="Work Log Evidence"
+                              className="max-w-full max-h-full w-auto h-auto object-contain transition-transform duration-500 hover:scale-105"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="p-3 flex items-center justify-between gap-2 bg-card/50 h-[52px]">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <Avatar className="w-6 h-6 border border-border">
+                                <AvatarImage src={(img.log.user as any).profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${img.log.user.name}${img.log.user.name === "Chonthicha limpiti" ? "&top[]=longHair&top[]=longHairBob&top[]=longHairCurly&top[]=longHairStraight&facialHairProbability=0" : "&top[]=shortHair&top[]=shortHairTheCaesar&top[]=shortHairShortFlat&top[]=shortHairShortRound&top[]=shortHairShortWaved&facialHairProbability=20"}`} />
+                                <AvatarFallback className={AVATAR_COLORS[img.log.user.id % AVATAR_COLORS.length]}>
+                                  {img.log.user.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-[10px] font-bold font-prompt truncate text-foreground">{img.log.user.name}</span>
+                                <span className="text-[9px] text-muted-foreground font-prompt truncate">{formatThaiDate(new Date(img.log.date))}</span>
+                              </div>
+                            </div>
+                            {userData && (userData.role === "ADMIN" || userData.id === img.log.user.id) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground rounded-full">
+                                    <MoreVertical className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-32">
+                                  <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
+                                    <Pencil className="w-3.5 h-3.5 mr-2" />
+                                    แก้ไข
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeleteImage(img.log, img.url)} className="text-destructive focus:text-destructive">
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                    ลบรูปภาพ
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </div>
-
-                        {userData && (userData.role === "ADMIN" || userData.id === img.log.user.id) && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground rounded-full">
-                                <MoreVertical className="w-3 h-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-32">
-                              <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
-                                <Pencil className="w-3.5 h-3.5 mr-2" />
-                                แก้ไข
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteWorkLog(img.log.id)} className="text-destructive focus:text-destructive">
-                                <Trash2 className="w-3.5 h-3.5 mr-2" />
-                                ลบ
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </ScrollArea>
           </div>

@@ -23,41 +23,34 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    console.log("[v0] Settings page - user:", user, "authLoading:", authLoading)
     if (!authLoading && (!user || user.role !== "ADMIN")) {
-      console.log("[v0] Not admin, redirecting to home")
       router.push("/")
     }
   }, [user, authLoading, router])
 
   useEffect(() => {
     if (user?.role === "ADMIN") {
-      console.log("[v0] User is admin, fetching settings")
       fetchSettings()
     }
   }, [user])
 
   async function fetchSettings() {
-    console.log("[v0] Fetching settings...")
     try {
       const response = await fetch("/api/admin/settings")
-      console.log("[v0] Settings response status:", response.status)
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] Settings data:", data)
         setSettings(data.settings || [])
       } else {
-        console.error("[v0] Failed to fetch settings:", response.status)
+        console.error("Failed to fetch settings:", response.status)
       }
     } catch (error) {
-      console.error("[v0] Error fetching settings:", error)
+      console.error("Error fetching settings:", error)
     } finally {
       setLoading(false)
     }
   }
 
   async function updateSetting(key: string, value: string) {
-    console.log("[v0] Updating setting:", key, "to:", value)
     setSaving(true)
     try {
       const response = await fetch("/api/admin/settings", {
@@ -65,16 +58,14 @@ export default function AdminSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value }),
       })
-      console.log("[v0] Update response status:", response.status)
       if (response.ok) {
-        console.log("[v0] Setting updated successfully")
         fetchSettings()
         router.refresh() // Refresh server components to apply global theme immediately
       } else {
-        console.error("[v0] Failed to update setting:", response.status)
+        console.error("Failed to update setting:", response.status)
       }
     } catch (error) {
-      console.error("[v0] Error updating setting:", error)
+      console.error("Error updating setting:", error)
     } finally {
       setSaving(false)
     }
@@ -87,12 +78,6 @@ export default function AdminSettingsPage() {
   const showWorkLogDescription = settings.find((s) => s.key === "showWorkLogDescription")?.value === "true"
   const showHiddenCards = settings.find((s) => s.key === "showHiddenCards")?.value === "true"
   const globalTheme = settings.find((s) => s.key === "globalTheme")?.value || "light"
-
-  console.log("[v0] Render - Settings:", settings)
-  console.log("[v0] Render - showHiddenCards:", showHiddenCards)
-  console.log("[v0] Render - showHiddenCards raw value:", settings.find((s) => s.key === "showHiddenCards")?.value)
-
-  console.log("[v0] Current settings - isRegistrationOpen:", isRegistrationOpen, "requireApproval:", requireApproval)
 
   if (authLoading || loading) {
     return (
@@ -125,7 +110,6 @@ export default function AdminSettingsPage() {
               <Switch
                 checked={isRegistrationOpen}
                 onCheckedChange={(checked) => {
-                  console.log("[v0] Registration toggle clicked, new value:", checked)
                   updateSetting("isRegistrationOpen", checked.toString())
                 }}
                 disabled={saving}
@@ -142,7 +126,6 @@ export default function AdminSettingsPage() {
               <Switch
                 checked={requireApproval}
                 onCheckedChange={(checked) => {
-                  console.log("[v0] Approval toggle clicked, new value:", checked)
                   updateSetting("requireApproval", checked.toString())
                 }}
                 disabled={saving}
@@ -239,6 +222,7 @@ export default function AdminSettingsPage() {
                     <SelectContent>
                       <SelectItem value="light">Light (สว่าง)</SelectItem>
                       <SelectItem value="violet">Violet (ม่วง)</SelectItem>
+                      <SelectItem value="midnight">Midnight (น้ำเงินเข้ม)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

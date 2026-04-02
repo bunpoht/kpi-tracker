@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import type { User } from "@/types"
 
@@ -25,22 +25,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function checkAuth() {
     try {
-      console.log("[v0] Checking authentication...")
       const response = await fetch("/api/auth/me", {
         credentials: "include",
       })
-      console.log("[v0] Auth check response:", response.status)
 
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] User authenticated:", data.user.email)
         setUser(data.user)
       } else {
-        console.log("[v0] Not authenticated")
         setUser(null)
       }
     } catch (error) {
-      console.error("[v0] Auth check failed:", error)
+      console.error("Auth check failed:", error)
       setUser(null)
     } finally {
       setLoading(false)
@@ -48,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    console.log("[v0] Attempting login for:", email)
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,14 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       const error = await response.json()
-      console.error("[v0] Login failed:", error.message)
       throw new Error(error.message || "Login failed")
     }
 
     const data = await response.json()
-    console.log("[v0] Login successful:", data.user.email)
     setUser(data.user)
-    console.log("[v0] User set, redirecting to dashboard...")
     router.push("/dashboard")
   }
 
@@ -92,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    console.log("[v0] Logging out...")
     await fetch("/api/auth/logout", {
       method: "POST",
       credentials: "include",
@@ -101,7 +92,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/")
   }
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login,
+    register,
+    logout
+  }), [user, loading])
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

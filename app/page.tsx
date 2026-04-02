@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/app/context/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,7 @@ import { KPICard } from "@/components/kpi-card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from "@dnd-kit/sortable"
-import { RotateCcw, LogIn, LogOut, User, Presentation, Calendar, ChevronDown, LayoutGrid, ListFilter, Sparkles } from "lucide-react"
+import { RotateCcw, LogIn, LogOut, User, Presentation, Calendar, ChevronDown, LayoutGrid, ListFilter, Sparkles, Clock } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -98,7 +98,31 @@ export default function HomePage() {
   const displayValues = getDisplayValues()
 
   useEffect(() => {
-    fetchGoals()
+    // Single effect to handle data fetching when filters change
+    const debounceFetch = setTimeout(() => {
+      fetchGoals()
+    }, 100) // Small debounce to prevent rapid re-fetches
+
+    // Update URL without scroll
+    const params = new URLSearchParams()
+    params.set("fiscalYear", fiscalYear)
+    params.set("month", selectedMonth)
+    const monthNum = Number.parseInt(selectedMonth)
+    const fiscalYearNum = Number.parseInt(fiscalYear)
+    const calendarYear = monthNum >= 10 ? fiscalYearNum - 1 : fiscalYearNum
+    const startYear = fiscalYearNum - 1
+    params.set("startMonth", "10")
+    params.set("startYear", startYear.toString())
+    params.set("endMonth", selectedMonth)
+    params.set("endYear", calendarYear.toString())
+
+    // Only push if the URL actually changes to avoid redundant history entries
+    const newUrl = `/?${params.toString()}`
+    if (window.location.search !== `?${params.toString()}`) {
+      router.push(newUrl, { scroll: false })
+    }
+
+    return () => clearTimeout(debounceFetch)
   }, [fiscalYear, selectedMonth])
 
   async function fetchGoals() {
@@ -118,8 +142,6 @@ export default function HomePage() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] Frontend fetchGoals - Received data:", data)
-        console.log("[v0] Frontend fetchGoals - All goals visibility:", data.goals?.map((g: any) => ({ id: g.id, title: g.title, isVisible: g.isVisible })))
         setGoals(data.goals || [])
       }
     } catch (error) {
@@ -136,23 +158,6 @@ export default function HomePage() {
     const params = new URLSearchParams()
     router.push(`/?${params.toString()}`)
   }
-
-  useEffect(() => {
-    const params = new URLSearchParams()
-    params.set("fiscalYear", fiscalYear)
-    params.set("month", selectedMonth)
-    const monthNum = Number.parseInt(selectedMonth)
-    const fiscalYearNum = Number.parseInt(fiscalYear)
-    const calendarYear = monthNum >= 10 ? fiscalYearNum - 1 : fiscalYearNum
-    const startYear = fiscalYearNum - 1
-    params.set("startMonth", "10")
-    params.set("startYear", startYear.toString())
-    params.set("endMonth", selectedMonth)
-    params.set("endYear", calendarYear.toString())
-    router.push(`/?${params.toString()}`, { scroll: false })
-  }, [fiscalYear, selectedMonth])
-
-
 
   const fiscalYearOptions = Array.from({ length: 10 }, (_, i) => 2026 + i)
 
@@ -212,6 +217,22 @@ export default function HomePage() {
     }
   }
 
+  // Calculate summary stats with useMemo
+  const stats = useMemo(() => {
+    const total = goals.length
+    const completed = goals.filter(g => g.percentage >= 100).length
+    const inProgress = total - completed
+    const average = total > 0 ? goals.reduce((acc, g) => acc + g.percentage, 0) / total : 0
+    return { total, completed, inProgress, average }
+  }, [goals])
+
+  const { totalGoals, completedGoals, inProgressGoals, averageProgress } = {
+    totalGoals: stats.total,
+    completedGoals: stats.completed,
+    inProgressGoals: stats.inProgress,
+    averageProgress: stats.average
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -223,12 +244,6 @@ export default function HomePage() {
     )
   }
 
-  // Calculate summary stats
-  const totalGoals = goals.length
-  const completedGoals = goals.filter(g => g.percentage >= 100).length
-  const inProgressGoals = totalGoals - completedGoals
-  const averageProgress = totalGoals > 0 ? goals.reduce((acc, g) => acc + g.percentage, 0) / totalGoals : 0
-
   return (
     <div className="min-h-screen bg-background/50 transition-colors duration-300">
       <div className="fixed inset-0 -z-10 h-full w-full bg-background">
@@ -239,11 +254,11 @@ export default function HomePage() {
         {/* Top Bar / Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-border/40">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground font-prompt">
-              Dashboard
+            <h1 className="text-4xl font-bold tracking-tight text-foreground font-prompt">
+              รายงานผลงานข่าวและการสื่อสารดิจิทัล
             </h1>
-            <p className="text-sm text-muted-foreground font-prompt font-light mt-1">
-              Overview of your performance for <span className="font-medium text-foreground">{displayValues.monthName} {displayValues.fullYear}</span>
+            <p className="text-3xl text-muted-foreground font-prompt font-semibold mt-2">
+              ประจำเดือน <span className="text-foreground">{displayValues.monthName} {displayValues.fullYear}</span>
             </p>
           </div>
 
@@ -259,7 +274,7 @@ export default function HomePage() {
               <PopoverContent className="w-80 p-4 rounded-xl shadow-lg border-border/40" align="end">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground font-prompt">Fiscal Year</label>
+                    <label className="text-xs font-medium text-muted-foreground font-prompt">ปีงบประมาณ</label>
                     <Select value={fiscalYear} onValueChange={setFiscalYear}>
                       <SelectTrigger className="w-full font-prompt rounded-lg"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -270,7 +285,7 @@ export default function HomePage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground font-prompt">Month</label>
+                    <label className="text-xs font-medium text-muted-foreground font-prompt">เดือน</label>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                       <SelectTrigger className="w-full font-prompt rounded-lg"><SelectValue>{displayValues.displayText}</SelectValue></SelectTrigger>
                       <SelectContent className="max-h-[200px]">
@@ -290,7 +305,7 @@ export default function HomePage() {
                   </div>
                   <div className="pt-2 flex justify-end">
                     <Button onClick={() => { handleReset(); setIsFilterOpen(false) }} variant="ghost" size="sm" className="font-prompt text-xs h-8 rounded-lg hover:bg-muted">
-                      <RotateCcw className="w-3 h-3 mr-1.5" />Reset
+                      <RotateCcw className="w-3 h-3 mr-1.5" />รีเซ็ต
                     </Button>
                   </div>
                 </div>
@@ -303,7 +318,7 @@ export default function HomePage() {
 
             {user?.role === "ADMIN" && (
               <Button onClick={() => router.push("/goals")} className="h-10 px-4 font-prompt rounded-lg shadow-sm">
-                Create KPI
+                สร้างตัวชี้วัด
               </Button>
             )}
           </div>
@@ -311,42 +326,77 @@ export default function HomePage() {
 
         {/* Clean Stats Overview */}
         {goals.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="flex flex-col items-start justify-center p-6 bg-white rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300">
-              <span className="text-sm text-muted-foreground font-prompt mb-1">Total KPIs</span>
-              <span className="text-4xl text-foreground font-prompt">{totalGoals}</span>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="flex flex-col p-5 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <LayoutGrid className="w-16 h-16 transform rotate-12" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <LayoutGrid className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-muted-foreground font-prompt font-medium">ตัวชี้วัดทั้งหมด</span>
+              </div>
+              <span className="text-3xl md:text-4xl text-foreground font-prompt font-bold">{totalGoals}</span>
             </div>
-            <div className="flex flex-col items-start justify-center p-6 bg-white rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300">
-              <span className="text-sm text-muted-foreground font-prompt mb-1">Completed</span>
-              <span className="text-4xl text-green-600 font-prompt">{completedGoals}</span>
+
+            <div className="flex flex-col p-5 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-green-500">
+                <Sparkles className="w-16 h-16 transform rotate-12" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-muted-foreground font-prompt font-medium">ดำเนินการแล้วเสร็จ</span>
+              </div>
+              <span className="text-3xl md:text-4xl text-green-600 dark:text-green-400 font-prompt font-bold">{completedGoals}</span>
             </div>
-            <div className="flex flex-col items-start justify-center p-6 bg-white rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300">
-              <span className="text-sm text-muted-foreground font-prompt mb-1">In Progress</span>
-              <span className="text-4xl text-orange-500 font-prompt">{inProgressGoals}</span>
+
+            <div className="flex flex-col p-5 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-orange-500">
+                <Clock className="w-16 h-16 transform rotate-12" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-muted-foreground font-prompt font-medium">อยู่ระหว่างดำเนินการ</span>
+              </div>
+              <span className="text-3xl md:text-4xl text-orange-600 dark:text-orange-400 font-prompt font-bold">{inProgressGoals}</span>
             </div>
-            <div className="flex flex-col items-start justify-center p-6 bg-white rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300">
-              <span className="text-sm text-muted-foreground font-prompt mb-1">Average Progress</span>
-              <span className="text-4xl text-blue-600 font-prompt">{averageProgress.toFixed(0)}%</span>
+
+            <div className="flex flex-col p-5 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-blue-500">
+                <Presentation className="w-16 h-16 transform rotate-12" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Presentation className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-muted-foreground font-prompt font-medium">ความคืบหน้าเฉลี่ย</span>
+              </div>
+              <span className="text-3xl md:text-4xl text-blue-600 dark:text-blue-400 font-prompt font-bold">{averageProgress.toFixed(0)}%</span>
             </div>
           </div>
         )}
 
         {/* KPI Grid */}
         {goals.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 bg-white/50 backdrop-blur-sm rounded-[2rem] border border-dashed border-border/40">
+          <div className="flex flex-col items-center justify-center py-32 bg-card/50 backdrop-blur-sm rounded-[2rem] border border-dashed border-border/40">
             <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mb-6">
               <LayoutGrid className="w-10 h-10 text-primary/40" />
             </div>
-            <h3 className="text-xl font-semibold text-foreground font-prompt mb-2">No KPIs Found</h3>
+            <h3 className="text-xl font-semibold text-foreground font-prompt mb-2">ไม่พบข้อมูลตัวชี้วัด</h3>
             <p className="text-muted-foreground font-prompt mb-8 text-center max-w-md font-light">
-              There are no KPIs assigned for this period.
+              ไม่มีตัวชี้วัดที่ได้รับมอบหมายในช่วงเวลานี้
             </p>
           </div>
         ) : (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold font-prompt text-foreground">Your KPIs</h2>
-              <span className="text-sm text-muted-foreground font-prompt bg-secondary/50 px-3 py-1 rounded-full">{goals.length} Items</span>
+              <h2 className="text-lg font-semibold font-prompt text-foreground">ตัวชี้วัดของคุณ</h2>
+              <span className="text-sm text-muted-foreground font-prompt bg-secondary/50 px-3 py-1 rounded-full">{goals.length} รายการ</span>
             </div>
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

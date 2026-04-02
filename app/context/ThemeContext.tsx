@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react"
 
-type Theme = "light" | "violet"
+type Theme = "light" | "violet" | "midnight"
 
 interface ThemeContextType {
   theme: Theme
@@ -33,20 +33,26 @@ export function ThemeProvider({ children, forcedTheme }: { children: React.React
     }
   }, [forcedTheme])
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = useCallback((newTheme: Theme) => {
     if (forcedTheme) return // Cannot change if forced
     setThemeState(newTheme)
     localStorage.setItem("theme", newTheme)
     document.documentElement.setAttribute("data-theme", newTheme)
-  }
+  }, [forcedTheme])
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     if (forcedTheme) return // Cannot toggle if forced
-    const newTheme = theme === "light" ? "violet" : "light"
+    const newTheme = theme === "light" ? "violet" : theme === "violet" ? "midnight" : "light"
     setTheme(newTheme)
-  }
+  }, [forcedTheme, theme, setTheme])
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>{children}</ThemeContext.Provider>
+  const value = useMemo(() => ({
+    theme,
+    toggleTheme,
+    setTheme
+  }), [theme, toggleTheme, setTheme])
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

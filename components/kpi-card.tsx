@@ -1,5 +1,4 @@
-"use client"
-
+import { memo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -42,7 +41,7 @@ const AVATAR_COLORS = [
   "bg-amber-100 text-amber-700 border-amber-200",
 ]
 
-export function KPICard({
+export const KPICard = memo(function KPICard({
   id,
   title,
   progress,
@@ -69,11 +68,30 @@ export function KPICard({
     zIndex: isDragging ? 50 : undefined,
   }
 
+  // Smart Status Logic
+  let statusColor = "text-primary"
+  let progressColor = "from-primary/80 to-primary"
+  let bgColor = "bg-primary/10"
+
+  if (percentage >= 80) {
+    statusColor = "text-green-600 dark:text-green-400"
+    progressColor = "from-green-500/80 to-green-500"
+    bgColor = "bg-green-500/10"
+  } else if (percentage >= 50) {
+    statusColor = "text-orange-600 dark:text-orange-400"
+    progressColor = "from-orange-500/80 to-orange-500"
+    bgColor = "bg-orange-500/10"
+  } else {
+    statusColor = "text-red-600 dark:text-red-400"
+    progressColor = "from-red-500/80 to-red-500"
+    bgColor = "bg-red-500/10"
+  }
+
   return (
     <div ref={setNodeRef} style={style} className="h-full group">
       <Card
-        className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none shadow-sm h-full bg-white group-hover:shadow-primary/10 rounded-2xl ${isAdmin ? "cursor-move" : "cursor-pointer"
-          } ${!isVisible ? "opacity-60 bg-gray-50" : ""}`}
+        className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none shadow-sm h-full bg-card group-hover:shadow-primary/10 rounded-2xl ${isAdmin ? "cursor-move" : "cursor-pointer"
+          } ${!isVisible ? "opacity-60 bg-muted" : ""}`}
       >
         {/* Drag Handle for Admin */}
         {isAdmin && (
@@ -128,7 +146,7 @@ export function KPICard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 absolute bottom-3 right-3 z-30 opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 hover:bg-white shadow-sm"
+                  className="h-7 w-7 absolute bottom-3 right-3 z-30 opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 hover:bg-background shadow-sm"
                   onClick={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -153,7 +171,7 @@ export function KPICard({
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-prompt text-primary">
+                  <span className={`text-4xl font-prompt ${statusColor}`}>
                     {percentage.toFixed(0)}
                   </span>
                   <span className="text-sm text-muted-foreground font-medium">%</span>
@@ -167,7 +185,7 @@ export function KPICard({
 
               <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
                 <div
-                  className="h-full w-full flex-1 bg-gradient-to-r from-primary/80 to-primary transition-all duration-500 ease-in-out"
+                  className={`h-full w-full flex-1 bg-gradient-to-r ${progressColor} transition-all duration-500 ease-in-out`}
                   style={{ transform: `translateX(-${100 - (Math.min(percentage, 100))}%)` }}
                 />
               </div>
@@ -183,4 +201,4 @@ export function KPICard({
       </Card>
     </div >
   )
-}
+})
