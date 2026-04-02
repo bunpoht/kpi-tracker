@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         return sum + Number.parseFloat(log.completedWork.toString())
       }, 0)
 
-      const percentage = Math.min((totalProgress / goal.target) * 100, 100)
+      const percentage = goal.target > 0 ? (totalProgress / goal.target) * 100 : 0
 
       const goalAssignments = assignments?.filter((a) => a.goalId === goal.id) || []
       const assignedUsers = goalAssignments
