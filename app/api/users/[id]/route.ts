@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth"
 import bcrypt from "bcryptjs"
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get("token")?.value
@@ -18,7 +18,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ message: "Unauthorized" }, { status: 403 })
     }
 
-    const userId = Number.parseInt(params.id)
+    const { id } = await params
+    const userId = Number.parseInt(id)
 
     // Prevent deleting yourself
     if (decoded.id === userId) {
@@ -38,7 +39,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get("token")?.value
@@ -52,7 +53,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ message: "Unauthorized" }, { status: 403 })
     }
 
-    const userId = Number.parseInt(params.id)
+    const { id: idParam } = await params
+    const userId = Number.parseInt(idParam)
     const { password, role } = await request.json()
 
     if (!password && !role) {

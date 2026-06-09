@@ -142,7 +142,11 @@ export function EditWorkLogForm({ workLog, onSuccess, onCancel }: { workLog: Wor
         const subMetricValuesObj: Record<string, number> = {}
         Object.entries(subMetricValues).forEach(([subMetricId, value]) => {
           if (value !== "") {
-            subMetricValuesObj[subMetricId] = Number.parseFloat(value)
+            const numValue = Number.parseFloat(value)
+            if (numValue === 0) {
+              throw new Error("ไม่สามารถกรอกค่า 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
+            }
+            subMetricValuesObj[subMetricId] = numValue
           }
         })
 
@@ -152,8 +156,14 @@ export function EditWorkLogForm({ workLog, onSuccess, onCancel }: { workLog: Wor
 
         bodyData.subMetricValues = subMetricValuesObj
       } else {
-        if (completedWork === "" || parseFloat(completedWork) < 0) {
+        if (completedWork === "") {
           throw new Error("กรุณากรอกผลงานที่ทำเสร็จ")
+        }
+        if (parseFloat(completedWork) === 0) {
+          throw new Error("ไม่สามารถกรอกค่า 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
+        }
+        if (parseFloat(completedWork) < 0) {
+          throw new Error("ไม่สามารถกรอกค่าติดลบได้")
         }
         bodyData.completedWork = parseFloat(completedWork)
       }
@@ -217,7 +227,8 @@ export function EditWorkLogForm({ workLog, onSuccess, onCancel }: { workLog: Wor
                   id={`subMetric-${subMetric.id}`}
                   type="number"
                   step="0.01"
-                  placeholder="ระบุจำนวน (ถ้าไม่มีให้ใส่ 0 หรือเว้นว่าง)"
+                  min="0.01"
+                  placeholder="ระบุจำนวน (ต้องมากกว่า 0 หรือเว้นว่าง)"
                   value={subMetricValues[subMetric.id] || ""}
                   onChange={(e) => setSubMetricValues(prev => ({ ...prev, [subMetric.id]: e.target.value }))}
                   className="font-prompt bg-background border-input text-foreground"
@@ -234,8 +245,8 @@ export function EditWorkLogForm({ workLog, onSuccess, onCancel }: { workLog: Wor
               id="completedWork"
               type="number"
               step="0.01"
-              min="0"
-              placeholder="ระบุจำนวน"
+              min="0.01"
+              placeholder="ระบุจำนวน (ต้องมากกว่า 0)"
               value={completedWork}
               onChange={(e) => setCompletedWork(e.target.value)}
               required

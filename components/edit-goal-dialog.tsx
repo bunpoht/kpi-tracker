@@ -125,6 +125,15 @@ export function EditGoalDialog({ goal, assignments, onSuccess }: EditGoalDialogP
 
     try {
       const validAssignees = assignees.filter((a) => a.userId > 0 && a.assignedTarget)
+
+      // ตรวจสอบค่าเป้าหมายไม่ให้เป็น 0
+      const zeroTargetAssignee = validAssignees.find((a) => Number.parseFloat(a.assignedTarget) === 0)
+      if (zeroTargetAssignee) {
+        alert("ไม่สามารถกำหนดเป้าหมายเป็น 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
+        setLoading(false)
+        return
+      }
+
       const totalTarget = validAssignees.reduce((sum, a) => sum + Number.parseFloat(a.assignedTarget), 0)
 
       const validSubMetrics = subMetrics.filter((sm) => sm.name.trim())
@@ -259,7 +268,8 @@ export function EditGoalDialog({ goal, assignments, onSuccess }: EditGoalDialogP
                     <Input
                       type="number"
                       step="0.01"
-                      placeholder="Target"
+                      min="0.01"
+                      placeholder="Target (ต้องมากกว่า 0)"
                       value={assignee.assignedTarget}
                       onChange={(e) => updateAssignee(index, "assignedTarget", e.target.value)}
                     />

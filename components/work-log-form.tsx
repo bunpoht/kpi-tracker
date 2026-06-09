@@ -78,7 +78,11 @@ export function WorkLogForm({ goals, onSuccess }: WorkLogFormProps) {
         const subMetricValuesObj: Record<string, number> = {}
         Object.entries(subMetricValues).forEach(([subMetricId, value]) => {
           if (value !== "") {
-            subMetricValuesObj[subMetricId] = Number.parseFloat(value)
+            const numValue = Number.parseFloat(value)
+            if (numValue === 0) {
+              throw new Error("ไม่สามารถกรอกค่า 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
+            }
+            subMetricValuesObj[subMetricId] = numValue
           }
         })
 
@@ -100,8 +104,11 @@ export function WorkLogForm({ goals, onSuccess }: WorkLogFormProps) {
 
         if (!response.ok) throw new Error("Failed to save work log")
       } else {
-        if (!completedWork && completedWork !== "0") {
+        if (!completedWork) {
           throw new Error("กรุณาระบุผลงานที่ทำเสร็จ")
+        }
+        if (Number.parseFloat(completedWork) === 0) {
+          throw new Error("ไม่สามารถกรอกค่า 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
         }
 
         const response = await fetch("/api/worklogs", {
@@ -209,7 +216,8 @@ export function WorkLogForm({ goals, onSuccess }: WorkLogFormProps) {
                   id={`subMetric-${subMetric.id}`}
                   type="number"
                   step="0.01"
-                  placeholder="ระบุจำนวน"
+                  min="0.01"
+                  placeholder="ระบุจำนวน (ต้องมากกว่า 0)"
                   value={subMetricValues[subMetric.id] || ""}
                   onChange={(e) => setSubMetricValues(prev => ({ ...prev, [subMetric.id]: e.target.value }))}
                   className="font-prompt bg-background border-input text-foreground h-10 focus:ring-primary/20"
@@ -227,8 +235,8 @@ export function WorkLogForm({ goals, onSuccess }: WorkLogFormProps) {
             id="completedWork"
             type="number"
             step="0.01"
-            min="0"
-            placeholder="ระบุจำนวนหน่วยที่ทำได้"
+            min="0.01"
+            placeholder="ระบุจำนวนหน่วยที่ทำได้ (ต้องมากกว่า 0)"
             value={completedWork}
             onChange={(e) => setCompletedWork(e.target.value)}
             required={!subMetrics.length}

@@ -106,6 +106,13 @@ export function CreateGoalDialog({ onSuccess }: CreateGoalDialogProps) {
       return
     }
 
+    // ตรวจสอบค่าเป้าหมายไม่ให้เป็น 0
+    const zeroTargetAssignment = validAssignments.find((a) => Number.parseFloat(a.assignedTarget) === 0)
+    if (zeroTargetAssignment) {
+      setError("ไม่สามารถกำหนดเป้าหมายเป็น 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
+      return
+    }
+
     const totalTarget = validAssignments.reduce((sum, a) => sum + Number.parseFloat(a.assignedTarget), 0)
 
     console.log("[v0] Creating goal with calculated target:", totalTarget)
@@ -312,7 +319,8 @@ export function CreateGoalDialog({ onSuccess }: CreateGoalDialogProps) {
                       id={`target-${index}`}
                       type="number"
                       step="0.01"
-                      placeholder="เป้าหมาย"
+                      min="0.01"
+                      placeholder="เป้าหมาย (ต้องมากกว่า 0)"
                       value={assignment.assignedTarget}
                       onChange={(e) => updateAssignment(index, "assignedTarget", e.target.value)}
                       required

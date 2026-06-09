@@ -71,7 +71,11 @@ export function WorkLogFormDialog({ goalId, onSuccess }: WorkLogFormDialogProps)
         const subMetricValuesObj: Record<string, number> = {}
         Object.entries(subMetricValues).forEach(([subMetricId, value]) => {
           if (value !== "") {
-            subMetricValuesObj[subMetricId] = Number.parseFloat(value)
+            const numValue = Number.parseFloat(value)
+            if (numValue === 0) {
+              throw new Error("ไม่สามารถกรอกค่า 0 ได้ กรุณากรอกจำนวนที่มากกว่า 0")
+            }
+            subMetricValuesObj[subMetricId] = numValue
           }
         })
 
@@ -142,7 +146,8 @@ export function WorkLogFormDialog({ goalId, onSuccess }: WorkLogFormDialogProps)
                   id={`subMetric-${subMetric.id}`}
                   type="number"
                   step="0.01"
-                  placeholder="ระบุจำนวน (ถ้าไม่มีให้ใส่ 0 หรือเว้นว่าง)"
+                  min="0.01"
+                  placeholder="ระบุจำนวน (ต้องมากกว่า 0 หรือเว้นว่าง)"
                   value={subMetricValues[subMetric.id] || ""}
                   onChange={(e) => setSubMetricValues(prev => ({ ...prev, [subMetric.id]: e.target.value }))}
                   className="font-prompt bg-background border-input text-foreground placeholder:text-muted-foreground focus:ring-primary"
@@ -159,7 +164,8 @@ export function WorkLogFormDialog({ goalId, onSuccess }: WorkLogFormDialogProps)
               id="completedWork"
               type="number"
               step="0.01"
-              placeholder="ระบุจำนวน"
+              min="0.01"
+              placeholder="ระบุจำนวน (ต้องมากกว่า 0)"
               value={completedWork}
               onChange={(e) => setCompletedWork(e.target.value)}
               required
