@@ -1184,8 +1184,6 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
         </div>
       </div>
 
-      </div>
-
       {/* Upload Monthly Images Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={(open) => {
         setShowUploadDialog(open)
