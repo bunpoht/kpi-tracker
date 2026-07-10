@@ -145,10 +145,6 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   }, [goalId, startDate, endDate])
 
   useEffect(() => {
-    fetchMonthlyImages()
-  }, [selectedMonthValue, selectedFiscalYear])
-
-  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Left arrow key - go to previous KPI
       if (event.key === "ArrowLeft" && hasPrevious) {
@@ -579,6 +575,10 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   const [selectedMonthValue, setSelectedMonthValue] = useState<string>(() => {
     return searchParams.get("month") || defaultMonth
   })
+
+  useEffect(() => {
+    fetchMonthlyImages()
+  }, [selectedMonthValue, selectedFiscalYear])
 
   const fiscalYearOptions = Array.from({ length: 10 }, (_, i) => 2026 + i)
 
