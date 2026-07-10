@@ -20,10 +20,11 @@ import {
   LabelList,
 } from "recharts"
 import type { Goal, GoalAssignment, WorkLog } from "@/types"
-import { X, Home, ChevronLeft, ChevronRight, Filter, LogIn, LogOut, LayoutDashboard, Pencil, Trash2, Calendar, User, Clock, MoreVertical, Grid, RectangleVertical, Layers } from 'lucide-react'
+import { X, Home, ChevronLeft, ChevronRight, Filter, LogIn, LogOut, LayoutDashboard, Pencil, Trash2, Calendar, User, Clock, MoreVertical, Grid, RectangleVertical, Layers, ImagePlus, Upload } from 'lucide-react'
 import { EditWorkLogForm } from "@/components/edit-worklog-dialog"
 import { WorkLogFormDialog } from "@/components/worklog-form-dialog"
-import { MonthlyGallery } from "@/components/monthly-gallery"
+import { ImageUpload } from "@/components/image-upload"
+
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import {
   DropdownMenu,
@@ -104,6 +105,12 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   // State for Left Column Layout: 'split' | 'unified'
   const [leftColumnLayout, setLeftColumnLayout] = useState<'split' | 'unified'>('unified')
 
+  // Monthly images state
+  const [monthlyImages, setMonthlyImages] = useState<any[]>([])
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [uploadingMonthly, setUploadingMonthly] = useState(false)
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<string[]>([])
+
   const startMonth = searchParams.get("startMonth")
   const startYear = searchParams.get("startYear")
   const endMonth = searchParams.get("endMonth")
@@ -134,7 +141,12 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
     fetchAllGoals()
     fetchDisplaySettings()
     fetchBackgroundSetting()
+    fetchMonthlyImages()
   }, [goalId, startDate, endDate])
+
+  useEffect(() => {
+    fetchMonthlyImages()
+  }, [selectedMonthValue, selectedFiscalYear])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -325,14 +337,31 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   }, [filteredWorkLogs, imageFilterDate])
 
   // Flatten images for Masonry Gallery
-  const galleryImages = useMemo(() => {
+  const workLogImages = useMemo(() => {
     return monthFilteredWorkLogs.flatMap((log) =>
       (log.images || []).map((img: any) => ({
         ...img,
-        log: log, // Attach the parent log to the image for context
+        log: log,
+        sourceType: 'worklog' as const,
       })),
     )
   }, [monthFilteredWorkLogs])
+
+  // Merge work log images + monthly images
+  const galleryImages = useMemo(() => {
+    const monthlyMapped = monthlyImages.map((img: any) => ({
+      id: `monthly-${img.id}`,
+      url: img.url,
+      sourceType: 'monthly' as const,
+      monthlyId: img.id,
+      log: {
+        user: img.user || { id: img.userId, name: '?', email: '' },
+        date: img.createdAt,
+      },
+      caption: img.caption,
+    }))
+    return [...workLogImages, ...monthlyMapped]
+  }, [workLogImages, monthlyImages])
 
   const totalProgress = useMemo(() => {
     return filteredWorkLogs.reduce((sum, log) => sum + Number.parseFloat(log.completedWork.toString()), 0)
@@ -467,6 +496,67 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
   async function handleEditSuccess() {
     await fetchGoalDetails()
     await fetchMonthlyData()
+    await fetchMonthlyImages()
+  }
+
+  async function fetchMonthlyImages() {
+    try {
+      const monthNum = Number.parseInt(selectedMonthValue || currentMonth || '1')
+      const fy = Number.parseInt(selectedFiscalYear || fiscalYear || '2026')
+      const calYear = monthNum >= 10 ? fy - 1 : fy
+      const response = await fetch(`/api/monthly-images?month=${monthNum}&year=${calYear}&goalId=${goalId}`)
+      if (response.ok) {
+        const result = await response.json()
+        setMonthlyImages(result.images || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch monthly images:', error)
+    }
+  }
+
+  async function handleUploadMonthlyImages() {
+    if (pendingUploadFiles.length === 0) return
+    try {
+      setUploadingMonthly(true)
+      const monthNum = Number.parseInt(selectedMonthValue || currentMonth || '1')
+      const fy = Number.parseInt(selectedFiscalYear || fiscalYear || '2026')
+      const calYear = monthNum >= 10 ? fy - 1 : fy
+      const response = await fetch('/api/monthly-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: pendingUploadFiles,
+          month: monthNum,
+          year: calYear,
+          goalId: Number.parseInt(goalId),
+        }),
+      })
+      if (response.ok) {
+        setPendingUploadFiles([])
+        setShowUploadDialog(false)
+        fetchMonthlyImages()
+      }
+    } catch (error) {
+      console.error('Upload monthly images error:', error)
+    } finally {
+      setUploadingMonthly(false)
+    }
+  }
+
+  async function handleDeleteMonthlyImage(monthlyId: number) {
+    if (!confirm('ต้องการลบรูปภาพนี้ใช่ไหม?')) return
+    try {
+      const response = await fetch('/api/monthly-images', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: monthlyId }),
+      })
+      if (response.ok) {
+        setMonthlyImages(prev => prev.filter(img => img.id !== monthlyId))
+      }
+    } catch (error) {
+      console.error('Delete monthly image error:', error)
+    }
   }
 
   const getCurrentFiscalYearAndMonth = () => {
@@ -940,9 +1030,21 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                   </Button>
                 </div>
               </div>
-              <span className="text-xs text-muted-foreground font-prompt bg-muted px-2 py-1 rounded-full">
-                {galleryImages.length} รูปภาพ
-              </span>
+              <div className="flex items-center gap-2">
+                {userData && (
+                  <Button
+                    size="sm"
+                    className="font-prompt h-7 text-xs rounded-lg gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+                    onClick={() => setShowUploadDialog(true)}
+                  >
+                    <ImagePlus className="w-3.5 h-3.5" />
+                    เพิ่มรูป
+                  </Button>
+                )}
+                <span className="text-xs text-muted-foreground font-prompt bg-muted px-2 py-1 rounded-full">
+                  {galleryImages.length} รูปภาพ
+                </span>
+              </div>
             </div>
 
             <ScrollArea className="h-[calc(100vh-200px)] pr-4">
@@ -994,11 +1096,16 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-32">
-                                  <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
-                                    <Pencil className="w-3.5 h-3.5 mr-2" />
-                                    แก้ไข
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDeleteImage(img.log, img.url)} className="text-destructive focus:text-destructive">
+                                  {img.sourceType === 'worklog' && (
+                                    <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
+                                      <Pencil className="w-3.5 h-3.5 mr-2" />
+                                      แก้ไข
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => img.sourceType === 'monthly' ? handleDeleteMonthlyImage(img.monthlyId) : handleDeleteImage(img.log, img.url)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
                                     <Trash2 className="w-3.5 h-3.5 mr-2" />
                                     ลบรูปภาพ
                                   </DropdownMenuItem>
@@ -1049,11 +1156,16 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-32">
-                                  <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
-                                    <Pencil className="w-3.5 h-3.5 mr-2" />
-                                    แก้ไข
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDeleteImage(img.log, img.url)} className="text-destructive focus:text-destructive">
+                                  {img.sourceType === 'worklog' && (
+                                    <DropdownMenuItem onClick={() => setEditingWorkLog(img.log)}>
+                                      <Pencil className="w-3.5 h-3.5 mr-2" />
+                                      แก้ไข
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => img.sourceType === 'monthly' ? handleDeleteMonthlyImage(img.monthlyId) : handleDeleteImage(img.log, img.url)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
                                     <Trash2 className="w-3.5 h-3.5 mr-2" />
                                     ลบรูปภาพ
                                   </DropdownMenuItem>
@@ -1067,29 +1179,49 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                   )}
                 </>
               )}
-
-              {/* Monthly Gallery for this KPI */}
-              <div className="mt-6">
-                {(() => {
-                  const monthNum = Number.parseInt(selectedMonthValue)
-                  const fy = Number.parseInt(selectedFiscalYear)
-                  const calYear = monthNum >= 10 ? fy - 1 : fy
-                  const thaiMonth = THAI_MONTHS.find(m => m.value === selectedMonthValue)
-                  return (
-                    <MonthlyGallery
-                      month={monthNum}
-                      year={calYear}
-                      monthName={thaiMonth?.label || ""}
-                      fullYear={calYear + 543}
-                      goalId={data.goal.id}
-                    />
-                  )
-                })()}
-              </div>
             </ScrollArea>
           </div>
         </div>
       </div>
+
+      </div>
+
+      {/* Upload Monthly Images Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={(open) => {
+        setShowUploadDialog(open)
+        if (!open) setPendingUploadFiles([])
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogTitle className="font-prompt text-foreground">เพิ่มรูปภาพประจำเดือน</DialogTitle>
+          <div className="space-y-4 pt-4">
+            <ImageUpload
+              onChange={(urls) => setPendingUploadFiles(prev => [...prev, ...urls])}
+              value={pendingUploadFiles}
+              onRemove={(url) => setPendingUploadFiles(prev => prev.filter(u => u !== url))}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowUploadDialog(false)} className="font-prompt">ยกเลิก</Button>
+              <Button
+                onClick={handleUploadMonthlyImages}
+                disabled={pendingUploadFiles.length === 0 || uploadingMonthly}
+                className="font-prompt gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+              >
+                {uploadingMonthly ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    กำลังบันทึก...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    บันทึก ({pendingUploadFiles.length} รูป)
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modals */}
       {selectedImage && (
