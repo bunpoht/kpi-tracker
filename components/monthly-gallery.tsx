@@ -22,9 +22,10 @@ interface MonthlyGalleryProps {
   year: number
   monthName: string
   fullYear: number
+  goalId?: number
 }
 
-export function MonthlyGallery({ month, year, monthName, fullYear }: MonthlyGalleryProps) {
+export function MonthlyGallery({ month, year, monthName, fullYear, goalId }: MonthlyGalleryProps) {
   const { user } = useAuth()
   const [images, setImages] = useState<MonthlyImage[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +45,9 @@ export function MonthlyGallery({ month, year, monthName, fullYear }: MonthlyGall
   async function fetchImages() {
     try {
       setLoading(true)
-      const response = await fetch(`/api/monthly-images?month=${month}&year=${year}`)
+      let url = `/api/monthly-images?month=${month}&year=${year}`
+      if (goalId) url += `&goalId=${goalId}`
+      const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
         setImages(data.images || [])
@@ -99,6 +102,7 @@ export function MonthlyGallery({ month, year, monthName, fullYear }: MonthlyGall
           month,
           year,
           caption: caption || null,
+          goalId: goalId || null,
         }),
       })
 

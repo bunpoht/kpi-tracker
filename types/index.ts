@@ -87,6 +87,7 @@ export interface SubMetric {
 export interface MonthlyImage {
   id: number
   userId: number
+  goalId?: number
   url: string
   publicId?: string
   month: number

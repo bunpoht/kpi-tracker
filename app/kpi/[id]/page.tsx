@@ -23,6 +23,7 @@ import type { Goal, GoalAssignment, WorkLog } from "@/types"
 import { X, Home, ChevronLeft, ChevronRight, Filter, LogIn, LogOut, LayoutDashboard, Pencil, Trash2, Calendar, User, Clock, MoreVertical, Grid, RectangleVertical, Layers } from 'lucide-react'
 import { EditWorkLogForm } from "@/components/edit-worklog-dialog"
 import { WorkLogFormDialog } from "@/components/worklog-form-dialog"
+import { MonthlyGallery } from "@/components/monthly-gallery"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import {
   DropdownMenu,
@@ -1067,6 +1068,23 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                 </>
               )}
             </ScrollArea>
+
+            {/* Monthly Gallery for this KPI */}
+            {(() => {
+              const monthNum = Number.parseInt(selectedMonthValue)
+              const fy = Number.parseInt(selectedFiscalYear)
+              const calYear = monthNum >= 10 ? fy - 1 : fy
+              const thaiMonth = THAI_MONTHS.find(m => m.value === selectedMonthValue)
+              return (
+                <MonthlyGallery
+                  month={monthNum}
+                  year={calYear}
+                  monthName={thaiMonth?.label || ""}
+                  fullYear={calYear + 543}
+                  goalId={data.goal.id}
+                />
+              )
+            })()}
           </div>
         </div>
       </div>

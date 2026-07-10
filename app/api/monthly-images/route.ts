@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const month = searchParams.get("month")
     const year = searchParams.get("year")
+    const goalId = searchParams.get("goalId")
 
     if (!month || !year) {
       return NextResponse.json({ message: "Missing month or year" }, { status: 400 })
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient()
 
-    const { data: images, error } = await supabase
+    let query = supabase
       .from("MonthlyImages")
       .select(`
         *,
@@ -35,7 +36,12 @@ export async function GET(request: NextRequest) {
       `)
       .eq("month", parseInt(month))
       .eq("year", parseInt(year))
-      .order("createdAt", { ascending: false })
+
+    if (goalId) {
+      query = query.eq("goalId", parseInt(goalId))
+    }
+
+    const { data: images, error } = await query.order("createdAt", { ascending: false })
 
     if (error) {
       console.error("Error fetching monthly images:", error)
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Invalid token" }, { status: 401 })
     }
 
-    const { images, month, year, caption } = await request.json()
+    const { images, month, year, caption, goalId } = await request.json()
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json({ message: "No images provided" }, { status: 400 })
@@ -91,6 +97,7 @@ export async function POST(request: NextRequest) {
         month: parseInt(month),
         year: parseInt(year),
         caption: caption || null,
+        goalId: goalId ? parseInt(goalId) : null,
       }
     })
 
