@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/app/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { KPICard } from "@/components/kpi-card"
-import { MonthlyGallery } from "@/components/monthly-gallery"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from "@dnd-kit/sortable"
@@ -423,21 +422,6 @@ export default function HomePage() {
             </DndContext>
           </div>
         )}
-
-        {/* Monthly Gallery */}
-        {(() => {
-          const monthNum = Number.parseInt(selectedMonth)
-          const fiscalYearNum = Number.parseInt(fiscalYear)
-          const calendarYear = monthNum >= 10 ? fiscalYearNum - 1 : fiscalYearNum
-          return (
-            <MonthlyGallery
-              month={monthNum}
-              year={calendarYear}
-              monthName={displayValues.monthName}
-              fullYear={displayValues.fullYear}
-            />
-          )
-        })()}
       </div>
     </div>
   )

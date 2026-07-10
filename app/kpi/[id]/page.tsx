@@ -1067,24 +1067,26 @@ export default function KPIDetailPage({ params }: { params: Promise<{ id: string
                   )}
                 </>
               )}
-            </ScrollArea>
 
-            {/* Monthly Gallery for this KPI */}
-            {(() => {
-              const monthNum = Number.parseInt(selectedMonthValue)
-              const fy = Number.parseInt(selectedFiscalYear)
-              const calYear = monthNum >= 10 ? fy - 1 : fy
-              const thaiMonth = THAI_MONTHS.find(m => m.value === selectedMonthValue)
-              return (
-                <MonthlyGallery
-                  month={monthNum}
-                  year={calYear}
-                  monthName={thaiMonth?.label || ""}
-                  fullYear={calYear + 543}
-                  goalId={data.goal.id}
-                />
-              )
-            })()}
+              {/* Monthly Gallery for this KPI */}
+              <div className="mt-6">
+                {(() => {
+                  const monthNum = Number.parseInt(selectedMonthValue)
+                  const fy = Number.parseInt(selectedFiscalYear)
+                  const calYear = monthNum >= 10 ? fy - 1 : fy
+                  const thaiMonth = THAI_MONTHS.find(m => m.value === selectedMonthValue)
+                  return (
+                    <MonthlyGallery
+                      month={monthNum}
+                      year={calYear}
+                      monthName={thaiMonth?.label || ""}
+                      fullYear={calYear + 543}
+                      goalId={data.goal.id}
+                    />
+                  )
+                })()}
+              </div>
+            </ScrollArea>
           </div>
         </div>
       </div>
