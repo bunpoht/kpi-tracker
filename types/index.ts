@@ -83,3 +83,15 @@ export interface SubMetric {
   displayOrder: number
   createdAt: Date
 }
+
+export interface MonthlyImage {
+  id: number
+  userId: number
+  url: string
+  publicId?: string
+  month: number
+  year: number
+  caption?: string
+  createdAt: Date
+  user?: User
+}
